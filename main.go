@@ -1,8 +1,8 @@
 package main
 
 import (
+	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v9"
 	"io"
 	"net/http"
@@ -35,15 +35,17 @@ func runApp(out io.Writer, listenAndServe func(string, http.Handler) error) erro
 		return err
 	}
 
-	gin.SetMode(gin.ReleaseMode)
+	redis := redis.NewClient(opt)
+
+	_, err = redis.Ping(context.Background()).Result()
+	if err != nil {
+		fmt.Fprintf(out, "Failed to connect to redis: %s\n", err.Error())
+	}
+
+	//	gin.SetMode(gin.ReleaseMode)
 	return listenAndServe(
 		config.listenAddress,
-		setupRouter(
-			out,
-			Storage{
-				redis: redis.NewClient(opt),
-			},
-		),
+		setupRouter(out, NewStorage(redis)),
 	)
 }
 
