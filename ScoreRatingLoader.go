@@ -30,7 +30,7 @@ func (loader *ScoreRatingLoader) load(year int, semester int, disciplineId int, 
 		// rating position is amount of students with Total greater than in current student
 		scoreRating.Rating = int(loader.redis.ZCount(
 			ctx, disciplineTotalsKey,
-			fmt.Sprintf("(%f", total),
+			"("+strconv.FormatFloat(total, 'f', -1, 64),
 			"+inf",
 		).Val()) + 1
 	}

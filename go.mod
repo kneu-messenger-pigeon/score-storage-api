@@ -7,6 +7,7 @@ replace github.com/go-redis/redis/v8 v8.8.0 => github.com/go-redis/redis/v9 v9.0
 require (
 	github.com/gin-gonic/gin v1.8.2
 	github.com/go-redis/redis/v9 v9.0.0-rc.2
+	github.com/go-redis/redismock/v9 v9.0.0-rc.2
 	github.com/joho/godotenv v1.4.0
 	github.com/kneu-messenger-pigeon/score-api v0.1.2
 	github.com/stretchr/testify v1.8.1
@@ -30,7 +31,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/stretchr/objx v0.5.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
-	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
+	golang.org/x/crypto v0.1.0 // indirect
 	golang.org/x/net v0.4.0 // indirect
 	golang.org/x/sys v0.3.0 // indirect
 	golang.org/x/text v0.5.0 // indirect
