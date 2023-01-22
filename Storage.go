@@ -159,7 +159,7 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	// Sort by date
 	sort.SliceStable(scores, func(i, j int) bool {
 		if scores[i].Lesson.Id == scores[j].Lesson.Id {
-			return scores[j].LessonHalf < scores[j].LessonHalf
+			return scores[i].LessonHalf < scores[j].LessonHalf
 		} else if lessonsSortMap[scores[i].Lesson.Id] == lessonsSortMap[scores[j].Lesson.Id] {
 			return scores[i].Lesson.Id < scores[j].Lesson.Id
 		} else {
