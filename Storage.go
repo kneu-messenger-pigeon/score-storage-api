@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/go-redis/redis/v9"
 	scoreApi "github.com/kneu-messenger-pigeon/score-api"
+	"sort"
 	"strconv"
 	"time"
 )
@@ -118,25 +119,34 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	}
 
 	var lessonIdCompacted string
-	var scoreString string
 	i := 0
 
 	scores := make([]scoreApi.Score, len(rawScores))
 
+	lessonsKeys := make([]string, len(rawScores))
 	lessonIds := make([]string, len(rawScores))
 	for lessonIdCompacted = range rawScores {
+		lessonsKeys[i] = lessonIdCompacted
 		lessonIds[i], _ = parseLessonIdAndHalfToString(lessonIdCompacted)
 		i++
 	}
-	lessonsValues := storage.redis.HMGet(context.Background(), disciplineKey, lessonIds...).Val()
 
-	i = 0
-	for lessonIdCompacted, scoreString = range rawScores {
+	lessonsValues := make([]string, len(lessonIds))
+	lessonsSortMap := make(map[int]int)
+	var lessonId int
+
+	for i, v := range storage.redis.HMGet(context.Background(), disciplineKey, lessonIds...).Val() {
+		lessonsValues[i] = v.(string)
+		lessonId, _ = strconv.Atoi(lessonIds[i])
+		lessonsSortMap[lessonId], _ = strconv.Atoi(lessonsValues[i][0:6])
+	}
+
+	for i, lessonIdCompacted = range lessonsKeys {
 		if i < len(lessonsValues) {
-			scores[i].Lesson, scores[i].LessonHalf = storage.makeLesson(lessonIdCompacted, lessonsValues[i].(string))
+			scores[i].Lesson, scores[i].LessonHalf = storage.makeLesson(lessonIdCompacted, lessonsValues[i])
 		}
 
-		score, _ := strconv.ParseFloat(scoreString, 10)
+		score, _ := strconv.ParseFloat(rawScores[lessonsKeys[i]], 10)
 		if IsAbsentScoreValue == score {
 			scores[i].IsAbsent = true
 		} else {
@@ -145,6 +155,17 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 
 		i++
 	}
+
+	// Sort by date
+	sort.SliceStable(scores, func(i, j int) bool {
+		if scores[i].Lesson.Id == scores[j].Lesson.Id {
+			return scores[j].LessonHalf < scores[j].LessonHalf
+		} else if lessonsSortMap[scores[i].Lesson.Id] == lessonsSortMap[scores[j].Lesson.Id] {
+			return scores[i].Lesson.Id < scores[j].Lesson.Id
+		} else {
+			return lessonsSortMap[scores[i].Lesson.Id] < lessonsSortMap[scores[j].Lesson.Id]
+		}
+	})
 
 	return scores
 }
