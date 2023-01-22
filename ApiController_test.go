@@ -150,7 +150,7 @@ func TestGetStudentDiscipline(t *testing.T) {
 		}
 
 		storage := NewMockStorageInterface(t)
-		storage.On("getDisciplineByStudentId", 23, 199).Return(expectedResult, nil)
+		storage.On("getDisciplineScoreResultByStudentId", 23, 199).Return(expectedResult, nil)
 
 		expectedBody, err := json.Marshal(expectedResult)
 		assert.NoError(t, err)
@@ -175,7 +175,7 @@ func TestGetStudentDiscipline(t *testing.T) {
 		}
 
 		storage := NewMockStorageInterface(t)
-		storage.On("getDisciplineByStudentId", 23, 199).Return(expectedResult, nil)
+		storage.On("getDisciplineScoreResultByStudentId", 23, 199).Return(expectedResult, nil)
 
 		router := setupRouter(out, storage)
 
@@ -196,7 +196,7 @@ func TestGetStudentDiscipline(t *testing.T) {
 		expectedError := errors.New("expected error")
 
 		storage := NewMockStorageInterface(t)
-		storage.On("getDisciplineByStudentId", 23, 199).Return(scoreApi.DisciplineScoreResult{}, expectedError)
+		storage.On("getDisciplineScoreResultByStudentId", 23, 199).Return(scoreApi.DisciplineScoreResult{}, expectedError)
 
 		router := setupRouter(out, storage)
 

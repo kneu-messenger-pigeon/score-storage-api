@@ -39,7 +39,7 @@ func (controller *ApiController) getStudentDiscipline(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Incorrect discipline_Id: " + c.Param("disciplineId")})
 
 	} else {
-		disciplineScoreResult, err := controller.storage.getDisciplineByStudentId(studentId, disciplineId)
+		disciplineScoreResult, err := controller.storage.getDisciplineScoreResultByStudentId(studentId, disciplineId)
 
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

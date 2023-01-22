@@ -12,7 +12,7 @@ import (
 
 type StorageInterface interface {
 	getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error)
-	getDisciplineByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error)
+	getDisciplineScoreResultByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error)
 }
 
 type Storage struct {
@@ -45,7 +45,7 @@ func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (sco
 	return disciplineScoreResults, nil
 }
 
-func (storage *Storage) getDisciplineByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error) {
+func (storage *Storage) getDisciplineScoreResultByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error) {
 	semester, err := storage.getSemesterByStudentIdAndDisciplineId(studentId, disciplineId)
 
 	if err != nil {
@@ -122,6 +122,7 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	i := 0
 
 	scores := make([]scoreApi.Score, len(rawScores))
+
 	lessonIds := make([]string, len(rawScores))
 	for lessonIdCompacted = range rawScores {
 		lessonIds[i], _ = parseLessonIdAndHalfToString(lessonIdCompacted)
@@ -131,7 +132,7 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 
 	i = 0
 	for lessonIdCompacted, scoreString = range rawScores {
-		if lessonsValues[i] != nil {
+		if i < len(lessonsValues) {
 			scores[i].Lesson, scores[i].LessonHalf = storage.makeLesson(lessonIdCompacted, lessonsValues[i].(string))
 		}
 
@@ -170,8 +171,11 @@ func parseLessonIdAndHalfToInt(lessonIdCompact string) (id int, half int) {
 }
 
 func parseLessonValueString(lessonString string) (dateString string, typeId int) {
-	typeId, _ = strconv.Atoi(lessonString[6:7])
-	return lessonString[4:6] + "." + lessonString[2:4] + ".20" + lessonString[0:2], typeId
+	if len(lessonString) >= 7 {
+		typeId, _ = strconv.Atoi(lessonString[6:])
+		dateString = lessonString[4:6] + "." + lessonString[2:4] + ".20" + lessonString[0:2]
+	}
+	return
 }
 
 func (storage *Storage) getDisciplineName(disciplineId int) string {
@@ -214,7 +218,7 @@ func makeLessonTypesMap(lessonTypesSlice *[]scoreApi.LessonType) map[int]scoreAp
 	return lessonTypesMap
 }
 
-func NewStorage(redis *redis.Client) *Storage {
+func NewStorage(redis *redis.Client, ctx context.Context) *Storage {
 	storage := &Storage{
 		redis: redis,
 		scoreRatingLoader: &ScoreRatingLoader{
@@ -222,7 +226,7 @@ func NewStorage(redis *redis.Client) *Storage {
 		},
 	}
 
-	go storage.periodicallyUpdateGeneralData(context.Background())
+	go storage.periodicallyUpdateGeneralData(ctx)
 
 	return storage
 }

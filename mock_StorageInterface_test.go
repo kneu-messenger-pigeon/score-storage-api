@@ -13,7 +13,7 @@ type MockStorageInterface struct {
 }
 
 // getDisciplineByStudentId provides a mock function with given fields: studentId, disciplineId
-func (_m *MockStorageInterface) getDisciplineByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error) {
+func (_m *MockStorageInterface) getDisciplineScoreResultByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error) {
 	ret := _m.Called(studentId, disciplineId)
 
 	var r0 scoreApi.DisciplineScoreResult

@@ -42,10 +42,12 @@ func runApp(out io.Writer, listenAndServe func(string, http.Handler) error) erro
 		fmt.Fprintf(out, "Failed to connect to redis: %s\n", err.Error())
 	}
 
+	storage := NewStorage(redis, context.Background())
+
 	//	gin.SetMode(gin.ReleaseMode)
 	return listenAndServe(
 		config.listenAddress,
-		setupRouter(out, NewStorage(redis)),
+		setupRouter(out, storage),
 	)
 }
 
