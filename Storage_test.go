@@ -212,6 +212,26 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 				},
 				{
 					Lesson: scoreApi.Lesson{
+						Id:   245,
+						Date: "12.02.2023",
+						Type: lessonTypes[1],
+					},
+					LessonHalf: 2,
+					Score:      2,
+					IsAbsent:   false,
+				},
+				{
+					Lesson: scoreApi.Lesson{
+						Id:   247,
+						Date: "12.02.2023",
+						Type: lessonTypes[1],
+					},
+					LessonHalf: 1,
+					Score:      1,
+					IsAbsent:   false,
+				},
+				{
+					Lesson: scoreApi.Lesson{
 						Id:   255,
 						Date: "14.02.2023",
 						Type: lessonTypes[15],
@@ -239,10 +259,14 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 
 		redisMock.ExpectHGetAll(studentDisciplineScoresKey).SetVal(map[string]string{
 			"245:1": "4.5",
+			"245:2": "2",
+			"247:1": "1",
 			"255:2": strconv.FormatFloat(IsAbsentScoreValue, 'f', -1, 64),
 		})
 
-		redisMock.ExpectHMGet(disciplineKey, "245", "255").SetVal([]interface{}{
+		redisMock.ExpectHMGet(disciplineKey, "245", "245", "247", "255").SetVal([]interface{}{
+			"2302121",
+			"2302121",
 			"2302121",
 			"23021415",
 		})
