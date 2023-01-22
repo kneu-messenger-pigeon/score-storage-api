@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v9"
 	"io"
 	"net/http"
@@ -44,7 +45,7 @@ func runApp(out io.Writer, listenAndServe func(string, http.Handler) error) erro
 
 	storage := NewStorage(redis, context.Background())
 
-	//	gin.SetMode(gin.ReleaseMode)
+	gin.SetMode(gin.ReleaseMode)
 	return listenAndServe(
 		config.listenAddress,
 		setupRouter(out, storage),
