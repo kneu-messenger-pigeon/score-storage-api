@@ -93,7 +93,7 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		}
 
 		redisClient, redisMock := redismock.NewClientMock()
-		redisMock.MatchExpectationsInOrder(true)
+		redisMock.MatchExpectationsInOrder(false)
 
 		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
 		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"

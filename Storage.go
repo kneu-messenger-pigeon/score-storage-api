@@ -8,6 +8,7 @@ import (
 	scoreApi "github.com/kneu-messenger-pigeon/score-api"
 	"sort"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -33,15 +34,25 @@ func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (sco
 	}
 
 	disciplineScoreResults := make([]scoreApi.DisciplineScoreResult, len(disciplineIds))
-	for i, disciplineId := range disciplineIds {
-		disciplineScoreResults[i] = scoreApi.DisciplineScoreResult{
-			Discipline: scoreApi.Discipline{
-				Id:   disciplineId,
-				Name: storage.getDisciplineName(disciplineId),
-			},
-			ScoreRating: storage.scoreRatingLoader.load(storage.year, semester, disciplineId, studentId),
-		}
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(disciplineIds))
+
+	for _index := range disciplineIds {
+		go func(index int) {
+			disciplineId := disciplineIds[index]
+			disciplineScoreResults[index] = scoreApi.DisciplineScoreResult{
+				Discipline: scoreApi.Discipline{
+					Id:   disciplineId,
+					Name: storage.getDisciplineName(disciplineId),
+				},
+				ScoreRating: storage.scoreRatingLoader.load(storage.year, semester, disciplineId, studentId),
+			}
+			wg.Done()
+		}(_index)
 	}
+
+	wg.Wait()
 
 	return disciplineScoreResults, nil
 }
