@@ -129,23 +129,9 @@ func TestGetStudentDiscipline(t *testing.T) {
 							LongName:  "Модульний контроль.",
 						},
 					},
-					LessonHalf: 1,
-					Score:      4.5,
-					IsAbsent:   false,
-				},
-				{
-					Lesson: scoreApi.Lesson{
-						Id:   245,
-						Date: time.Date(2023, time.Month(2), 14, 0, 0, 0, 0, time.Local),
-						Type: scoreApi.LessonType{
-							Id:        1,
-							ShortName: "ПрЗн",
-							LongName:  "Практичне зан.",
-						},
-					},
-					LessonHalf: 2,
-					Score:      0,
-					IsAbsent:   true,
+					FirstScore:  4.5,
+					SecondScore: 0,
+					IsAbsent:    true,
 				},
 			},
 		}

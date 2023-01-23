@@ -113,41 +113,60 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	disciplineKey := fmt.Sprintf("%d:%d:lessons:%d", storage.year, semester, disciplineId)
 
 	rawScores := storage.redis.HGetAll(context.Background(), studentDisciplineScoresKey).Val()
-
-	scores := make([]scoreApi.Score, len(rawScores))
 	if len(rawScores) == 0 {
-		return scores
+		return make([]scoreApi.Score, 0)
 	}
 
-	lessons := storage.redis.HGetAll(context.Background(), disciplineKey).Val()
+	var lessonId int
+
+	lessons := make(map[int]string)
+	for lessonIdString, lessonValue := range storage.redis.HGetAll(context.Background(), disciplineKey).Val() {
+		lessonId, _ = strconv.Atoi(lessonIdString)
+		lessons[lessonId] = lessonValue
+	}
 
 	var lessonTypeId int
+	var lessonDate time.Time
+	var lessonHalf int
 	var scoreFloat float64
+	var exists bool
 
-	i := -1
+	scoresMap := make(map[int]*scoreApi.Score, len(rawScores))
+
 	for lessonIdCompacted, scoreString := range rawScores {
-		i++
-		lessonId, lessonHalf := parseLessonIdAndHalfToString(lessonIdCompacted)
-		scores[i].Lesson.Id, _ = strconv.Atoi(lessonId)
-		scores[i].LessonHalf, _ = strconv.Atoi(lessonHalf)
-		if lessonValue, lessonExist := lessons[lessonId]; lessonExist {
-			scores[i].Lesson.Date, lessonTypeId = parseLessonValueString(lessonValue)
-			scores[i].Lesson.Type = storage.lessonTypes[lessonTypeId]
+		lessonId, lessonHalf = parseLessonIdAndHalf(lessonIdCompacted)
+
+		if _, exists = scoresMap[lessonId]; !exists {
+			lessonDate, lessonTypeId = parseLessonValueString(lessons[lessonId])
+			scoresMap[lessonId] = &scoreApi.Score{
+				Lesson: scoreApi.Lesson{
+					Id:   lessonId,
+					Date: lessonDate,
+					Type: storage.lessonTypes[lessonTypeId],
+				},
+			}
 		}
 
 		scoreFloat, _ = strconv.ParseFloat(scoreString, 10)
 		if IsAbsentScoreValue == scoreFloat {
-			scores[i].IsAbsent = true
-		} else {
-			scores[i].Score = float32(scoreFloat)
+			scoresMap[lessonId].IsAbsent = true
+		} else if lessonHalf == 1 {
+			scoresMap[lessonId].FirstScore = float32(scoreFloat)
+		} else if lessonHalf == 2 {
+			scoresMap[lessonId].SecondScore = float32(scoreFloat)
 		}
+	}
+
+	scores := make([]scoreApi.Score, len(scoresMap))
+	i := 0
+	for _, score := range scoresMap {
+		scores[i] = *score
+		i++
 	}
 
 	// Sort by date
 	sort.SliceStable(scores, func(i, j int) bool {
-		if scores[i].Lesson.Id == scores[j].Lesson.Id {
-			return scores[i].LessonHalf < scores[j].LessonHalf
-		} else if scores[i].Lesson.Date.Equal(scores[j].Lesson.Date) {
+		if scores[i].Lesson.Date.Equal(scores[j].Lesson.Date) {
 			return scores[i].Lesson.Id < scores[j].Lesson.Id
 		} else {
 			return scores[i].Lesson.Date.Before(scores[j].Lesson.Date)
@@ -157,8 +176,11 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	return scores
 }
 
-func parseLessonIdAndHalfToString(lessonIdCompacted string) (string, string) {
-	return lessonIdCompacted[:len(lessonIdCompacted)-2], lessonIdCompacted[len(lessonIdCompacted)-1:]
+func parseLessonIdAndHalf(lessonIdCompacted string) (lessonId int, lessonHalf int) {
+	lessonId, _ = strconv.Atoi(lessonIdCompacted[:len(lessonIdCompacted)-2])
+	lessonHalf, _ = strconv.Atoi(lessonIdCompacted[len(lessonIdCompacted)-1:])
+
+	return
 }
 
 func parseLessonValueString(lessonString string) (date time.Time, typeId int) {

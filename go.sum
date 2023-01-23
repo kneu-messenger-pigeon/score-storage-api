@@ -60,6 +60,10 @@ github.com/kneu-messenger-pigeon/score-api v0.1.2 h1:AuqtSdWwoMLIL/SLfE0ANZfG5mf
 github.com/kneu-messenger-pigeon/score-api v0.1.2/go.mod h1:xP8MpI8JaEeR7GUEWnq3p0meJ41Tz5+N+aRKNC4nRbM=
 github.com/kneu-messenger-pigeon/score-api v0.1.3 h1:7WRExR0VVle52jDKYa2e1+fHxjQ0Eri8dDUMtRYUZ9s=
 github.com/kneu-messenger-pigeon/score-api v0.1.3/go.mod h1:xP8MpI8JaEeR7GUEWnq3p0meJ41Tz5+N+aRKNC4nRbM=
+github.com/kneu-messenger-pigeon/score-api v0.1.4 h1:U0LAngarLvTW9xrXLg5jaoJE/KJdwbGqSE8h6ZJwaVc=
+github.com/kneu-messenger-pigeon/score-api v0.1.4/go.mod h1:xP8MpI8JaEeR7GUEWnq3p0meJ41Tz5+N+aRKNC4nRbM=
+github.com/kneu-messenger-pigeon/score-api v0.1.5 h1:WrAURHhkpKNI6trb2HORyVGyDqhR0/yWIR5XnaKkNVU=
+github.com/kneu-messenger-pigeon/score-api v0.1.5/go.mod h1:xP8MpI8JaEeR7GUEWnq3p0meJ41Tz5+N+aRKNC4nRbM=
 github.com/kr/pretty v0.1.0/go.mod h1:dAy3ld7l9f0ibDNOQOHHMYYIIbhfbHSm3C4ZsoJORNo=
 github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
 github.com/kr/pretty v0.3.0 h1:WgNl7dwNpEZ6jJ9k1snq4pZsg7DOEN8hP9Xw0Tsjwk0=

@@ -206,19 +206,9 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
-					LessonHalf: 1,
-					Score:      4.5,
-					IsAbsent:   false,
-				},
-				{
-					Lesson: scoreApi.Lesson{
-						Id:   245,
-						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
-						Type: lessonTypes[1],
-					},
-					LessonHalf: 2,
-					Score:      2,
-					IsAbsent:   false,
+					FirstScore:  4.5,
+					SecondScore: 2,
+					IsAbsent:    false,
 				},
 				{
 					Lesson: scoreApi.Lesson{
@@ -226,8 +216,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
-					LessonHalf: 1,
-					Score:      1,
+					FirstScore: 1,
 					IsAbsent:   false,
 				},
 				{
@@ -236,9 +225,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 						Date: time.Date(2023, time.Month(2), 14, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[15],
 					},
-					LessonHalf: 2,
-					Score:      0,
-					IsAbsent:   true,
+					IsAbsent: true,
 				},
 			},
 		}
