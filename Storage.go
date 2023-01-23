@@ -119,22 +119,26 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	}
 
 	var lessonIdCompacted string
-	i := 0
 
 	scores := make([]scoreApi.Score, len(rawScores))
 
 	lessonsKeys := make([]string, len(rawScores))
 	lessonIds := make([]string, len(rawScores))
+	lessonsValues := make([]string, len(rawScores))
+	lessonsSortMap := make(map[int]int)
+
+	i := 0
 	for lessonIdCompacted = range rawScores {
 		lessonsKeys[i] = lessonIdCompacted
-		lessonIds[i], _ = parseLessonIdAndHalfToString(lessonIdCompacted)
 		i++
 	}
 
-	lessonsValues := make([]string, len(lessonIds))
-	lessonsSortMap := make(map[int]int)
-	var lessonId int
+	sort.Strings(lessonsKeys)
+	for i, lessonIdCompacted = range lessonsKeys {
+		lessonIds[i], _ = parseLessonIdAndHalfToString(lessonIdCompacted)
+	}
 
+	var lessonId int
 	for i, v := range storage.redis.HMGet(context.Background(), disciplineKey, lessonIds...).Val() {
 		lessonsValues[i] = v.(string)
 		lessonId, _ = strconv.Atoi(lessonIds[i])
@@ -158,13 +162,7 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 
 	// Sort by date
 	sort.SliceStable(scores, func(i, j int) bool {
-		if scores[i].Lesson.Id == scores[j].Lesson.Id {
-			return scores[i].LessonHalf < scores[j].LessonHalf
-		} else if lessonsSortMap[scores[i].Lesson.Id] == lessonsSortMap[scores[j].Lesson.Id] {
-			return scores[i].Lesson.Id < scores[j].Lesson.Id
-		} else {
-			return lessonsSortMap[scores[i].Lesson.Id] < lessonsSortMap[scores[j].Lesson.Id]
-		}
+		return lessonsSortMap[scores[i].Lesson.Id] < lessonsSortMap[scores[j].Lesson.Id]
 	})
 
 	return scores

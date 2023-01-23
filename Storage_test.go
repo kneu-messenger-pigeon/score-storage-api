@@ -264,7 +264,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 			"255:2": strconv.FormatFloat(IsAbsentScoreValue, 'f', -1, 64),
 		})
 
-		redisMock.ExpectHMGet(disciplineKey, "247", "245", "245", "255").SetVal([]interface{}{
+		redisMock.ExpectHMGet(disciplineKey, "245", "245", "247", "255").SetVal([]interface{}{
 			"2302121",
 			"2302121",
 			"2302121",
