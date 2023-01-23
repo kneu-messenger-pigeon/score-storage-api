@@ -203,7 +203,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   245,
-						Date: "12.02.2023",
+						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
 					LessonHalf: 1,
@@ -213,7 +213,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   245,
-						Date: "12.02.2023",
+						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
 					LessonHalf: 2,
@@ -223,7 +223,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   247,
-						Date: "12.02.2023",
+						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
 					LessonHalf: 1,
@@ -233,7 +233,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   255,
-						Date: "14.02.2023",
+						Date: time.Date(2023, time.Month(2), 14, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[15],
 					},
 					LessonHalf: 2,
@@ -258,17 +258,16 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 		disciplineKey := "2026:1:lessons:199"
 
 		redisMock.ExpectHGetAll(studentDisciplineScoresKey).SetVal(map[string]string{
-			"247:1": "1",
-			"245:2": "2",
 			"245:1": "4.5",
 			"255:2": strconv.FormatFloat(IsAbsentScoreValue, 'f', -1, 64),
+			"245:2": "2",
+			"247:1": "1",
 		})
 
-		redisMock.ExpectHMGet(disciplineKey, "245", "245", "247", "255").SetVal([]interface{}{
-			"2302121",
-			"2302121",
-			"2302121",
-			"23021415",
+		redisMock.ExpectHGetAll(disciplineKey).SetVal(map[string]string{
+			"255": "23021415",
+			"245": "2302121",
+			"247": "2302121",
 		})
 
 		scoreRatingLoader := NewMockScoreRatingLoaderInterface(t)

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func TestGetStudentDisciplines(t *testing.T) {
@@ -121,7 +122,7 @@ func TestGetStudentDiscipline(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   245,
-						Date: "12.02.2023",
+						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: scoreApi.LessonType{
 							Id:        5,
 							ShortName: "МК",
@@ -135,7 +136,7 @@ func TestGetStudentDiscipline(t *testing.T) {
 				{
 					Lesson: scoreApi.Lesson{
 						Id:   245,
-						Date: "14.02.2023",
+						Date: time.Date(2023, time.Month(2), 14, 0, 0, 0, 0, time.Local),
 						Type: scoreApi.LessonType{
 							Id:        1,
 							ShortName: "ПрЗн",
