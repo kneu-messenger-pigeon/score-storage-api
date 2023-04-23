@@ -229,7 +229,7 @@ func (storage *Storage) periodicallyUpdateGeneralData(ctx context.Context) {
 			storage.lessonTypes = makeLessonTypesMap(&lessonTypes)
 		}
 
-		if storage.year == 0 && len(storage.lessonTypes) == 0 {
+		if storage.year == 0 || len(storage.lessonTypes) == 0 {
 			time.Sleep(time.Minute)
 		} else {
 			time.Sleep(time.Hour * 12)
