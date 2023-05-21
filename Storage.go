@@ -209,18 +209,26 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 }
 
 func (storage *Storage) getScore(semester int, disciplineId int, studentId int, lessonId int) scoreApi.Score {
+	ctx := context.Background()
 	studentDisciplineScoresKey := fmt.Sprintf("%d:%d:scores:%d:%d", storage.year, semester, studentId, disciplineId)
 	disciplineLessonsKey := fmt.Sprintf("%d:%d:lessons:%d", storage.year, semester, disciplineId)
 
-	lessonIdPrefix := strconv.Itoa(lessonId) + ":"
-	rawScores := storage.redis.HMGet(context.Background(), studentDisciplineScoresKey, lessonIdPrefix+"1", lessonIdPrefix+"2").Val()
-	if len(rawScores) != 2 || (rawScores[0] == nil && rawScores[1] == nil) {
+	lessonValue := storage.redis.HGet(ctx, disciplineLessonsKey, strconv.Itoa(lessonId)).Val()
+
+	if lessonValue == "" {
+		deletedLessonKey := fmt.Sprintf(
+			"%d:%d:deleted-lessons:%d:%d",
+			storage.year, semester, disciplineId, lessonId,
+		)
+
+		lessonValue = storage.redis.Get(ctx, deletedLessonKey).Val()
+	}
+
+	if lessonValue == "" {
 		return scoreApi.Score{}
 	}
 
-	lessonDate, lessonTypeId := parseLessonValueString(
-		storage.redis.HGet(context.Background(), disciplineLessonsKey, strconv.Itoa(lessonId)).Val(),
-	)
+	lessonDate, lessonTypeId := parseLessonValueString(lessonValue)
 
 	score := scoreApi.Score{
 		Lesson: scoreApi.Lesson{
@@ -229,6 +237,9 @@ func (storage *Storage) getScore(semester int, disciplineId int, studentId int, 
 			Type: storage.lessonTypes[lessonTypeId],
 		},
 	}
+
+	lessonIdPrefix := strconv.Itoa(lessonId) + ":"
+	rawScores := storage.redis.HMGet(ctx, studentDisciplineScoresKey, lessonIdPrefix+"1", lessonIdPrefix+"2").Val()
 
 	var scoreFloat float64
 

@@ -419,13 +419,13 @@ func TestGetDisciplineScore(t *testing.T) {
 
 		studentDisciplineScoresKey := "2026:1:scores:1200:199"
 		disciplineLessonsKey := "2026:1:lessons:199"
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
 
 		expectedScoreValues := make([]interface{}, 2)
 		expectedScoreValues[0] = "4.5"
 		expectedScoreValues[1] = "2"
 
 		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
-		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
 
 		storage := Storage{
 			redis:       redisClient,
@@ -476,11 +476,12 @@ func TestGetDisciplineScore(t *testing.T) {
 		studentDisciplineScoresKey := "2026:1:scores:1200:199"
 		disciplineLessonsKey := "2026:1:lessons:199"
 
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
+
 		expectedScoreValues := make([]interface{}, 2)
 		expectedScoreValues[0] = strconv.FormatFloat(IsAbsentScoreValue, 'f', 0, 64)
 
 		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
-		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
 
 		storage := Storage{
 			redis:       redisClient,
@@ -497,7 +498,7 @@ func TestGetDisciplineScore(t *testing.T) {
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
 
-	t.Run("noScore", func(t *testing.T) {
+	t.Run("deleted_lesson", func(t *testing.T) {
 		lessonTypes := GetTestLessonTypes()
 
 		expectedResult := scoreApi.DisciplineScore{
@@ -505,7 +506,16 @@ func TestGetDisciplineScore(t *testing.T) {
 				Id:   199,
 				Name: "Капітал!",
 			},
-			Score: scoreApi.Score{},
+			Score: scoreApi.Score{
+				Lesson: scoreApi.Lesson{
+					Id:   245,
+					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
+					Type: lessonTypes[1],
+				},
+				FirstScore:  0,
+				SecondScore: 0,
+				IsAbsent:    false,
+			},
 		}
 
 		redisClient, redisMock := redismock.NewClientMock()
@@ -518,6 +528,12 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
+
+		disciplineLessonsKey := "2026:1:lessons:199"
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").RedisNil()
+
+		disciplineDeletedLessonsKey := "2026:1:deleted-lessons:199:245"
+		redisMock.ExpectGet(disciplineDeletedLessonsKey).SetVal("2302121")
 
 		studentDisciplineScoresKey := "2026:1:scores:1200:199"
 
