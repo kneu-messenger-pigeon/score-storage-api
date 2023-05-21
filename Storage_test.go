@@ -385,6 +385,229 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 
 }
 
+func TestGetDisciplineScore(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{
+				Lesson: scoreApi.Lesson{
+					Id:   245,
+					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
+					Type: lessonTypes[1],
+				},
+				FirstScore:  4.5,
+				SecondScore: 2,
+				IsAbsent:    false,
+			},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+
+		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
+
+		studentDisciplineScoresKey := "2026:1:scores:1200:199"
+		disciplineLessonsKey := "2026:1:lessons:199"
+
+		expectedScoreValues := make([]interface{}, 2)
+		expectedScoreValues[0] = "4.5"
+		expectedScoreValues[1] = "2"
+
+		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResult, err := storage.getDisciplineScore(
+			1200, expectedResult.Discipline.Id, expectedResult.Score.Lesson.Id,
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedResult, actualResult)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("absent", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{
+				Lesson: scoreApi.Lesson{
+					Id:   245,
+					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
+					Type: lessonTypes[1],
+				},
+				FirstScore:  0,
+				SecondScore: 0,
+				IsAbsent:    true,
+			},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+
+		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
+
+		studentDisciplineScoresKey := "2026:1:scores:1200:199"
+		disciplineLessonsKey := "2026:1:lessons:199"
+
+		expectedScoreValues := make([]interface{}, 2)
+		expectedScoreValues[0] = strconv.FormatFloat(IsAbsentScoreValue, 'f', 0, 64)
+
+		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResult, err := storage.getDisciplineScore(
+			1200, expectedResult.Discipline.Id, expectedResult.Score.Lesson.Id,
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedResult, actualResult)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("noScore", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+
+		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
+
+		studentDisciplineScoresKey := "2026:1:scores:1200:199"
+
+		expectedScoreValues := make([]interface{}, 2)
+
+		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResult, err := storage.getDisciplineScore(
+			1200, expectedResult.Discipline.Id, 245,
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedResult, actualResult)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("student_has_not_discipline", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).RedisNil()
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResult, err := storage.getDisciplineScore(
+			1200, expectedResult.Discipline.Id, 245,
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, scoreApi.DisciplineScore{}, actualResult)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("redis_error", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedError := errors.New("expected error")
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		disciplineId := 850
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, disciplineId).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, disciplineId).SetErr(expectedError)
+
+		storage := Storage{
+			redis:             redisClient,
+			year:              2026,
+			lessonTypes:       lessonTypes,
+			scoreRatingLoader: NewMockScoreRatingLoaderInterface(t),
+		}
+
+		actualResult, actualErr := storage.getDisciplineScore(1200, disciplineId, 245)
+
+		assert.Error(t, actualErr)
+		assert.Equal(t, expectedError, actualErr)
+		assert.Equal(t, scoreApi.DisciplineScore{}, actualResult)
+
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+}
+
 func GetTestLessonTypes() map[int]scoreApi.LessonType {
 	return map[int]scoreApi.LessonType{
 		1: {

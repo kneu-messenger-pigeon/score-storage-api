@@ -236,6 +236,180 @@ func TestGetStudentDiscipline(t *testing.T) {
 	})
 }
 
+func TestGetStudentDisciplineScore(t *testing.T) {
+	t.Run("success", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{
+				Lesson: scoreApi.Lesson{
+					Id:   245,
+					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
+					Type: scoreApi.LessonType{
+						Id:        5,
+						ShortName: "МК",
+						LongName:  "Модульний контроль.",
+					},
+				},
+				FirstScore:  4.5,
+				SecondScore: 0,
+				IsAbsent:    true,
+			},
+		}
+
+		storage := NewMockStorageInterface(t)
+		storage.On("getDisciplineScore", 23, 199, 245).Return(expectedResult, nil)
+
+		expectedBody, err := json.Marshal(expectedResult)
+		assert.NoError(t, err)
+
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/23/disciplines/199/scores/245", nil)
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, expectedBody, w.Body.Bytes())
+	})
+
+	t.Run("not_exist_discipline", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   0,
+				Name: "",
+			},
+		}
+
+		storage := NewMockStorageInterface(t)
+		storage.On("getDisciplineScore", 23, 199, 245).Return(expectedResult, nil)
+
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/23/disciplines/199/scores/245", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+
+	t.Run("not_exist_lesson", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
+			Score: scoreApi.Score{
+				Lesson:      scoreApi.Lesson{},
+				FirstScore:  0,
+				SecondScore: 0,
+				IsAbsent:    false,
+			},
+		}
+
+		storage := NewMockStorageInterface(t)
+		storage.On("getDisciplineScore", 23, 199, 245).Return(expectedResult, nil)
+
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/23/disciplines/199/scores/245", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+
+	t.Run("storage_error", func(t *testing.T) {
+		out := &bytes.Buffer{}
+		expectedError := errors.New("expected error")
+
+		storage := NewMockStorageInterface(t)
+		storage.On("getDisciplineScore", 23, 199, 245).Return(scoreApi.DisciplineScore{}, expectedError)
+
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/23/disciplines/199/scores/245", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusInternalServerError, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+
+	t.Run("wrong student id ", func(t *testing.T) {
+		out := &bytes.Buffer{}
+
+		storage := NewMockStorageInterface(t)
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/-99/disciplines/199/scores/245", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+
+	t.Run("wrong discipline id ", func(t *testing.T) {
+		out := &bytes.Buffer{}
+
+		storage := NewMockStorageInterface(t)
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/650/disciplines/0/scores/123", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+
+	t.Run("wrong lesson id ", func(t *testing.T) {
+		out := &bytes.Buffer{}
+
+		storage := NewMockStorageInterface(t)
+		router := setupRouter(out, storage)
+
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest(http.MethodGet, "/v1/students/650/disciplines/445/scores/-3", nil)
+		router.ServeHTTP(w, req)
+
+		actualBody := gin.H{}
+		err := json.Unmarshal(w.Body.Bytes(), &actualBody)
+
+		assert.NoError(t, err)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+		assert.Contains(t, actualBody, "error")
+	})
+}
+
 func TestPingRoute(t *testing.T) {
 	out := &bytes.Buffer{}
 

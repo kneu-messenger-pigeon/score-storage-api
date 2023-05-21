@@ -15,6 +15,7 @@ import (
 type StorageInterface interface {
 	getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error)
 	getDisciplineScoreResultByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error)
+	getDisciplineScore(studentId int, disciplineId int, lessonId int) (scoreApi.DisciplineScore, error)
 }
 
 type Storage struct {
@@ -75,6 +76,26 @@ func (storage *Storage) getDisciplineScoreResultByStudentId(studentId int, disci
 		},
 		ScoreRating: storage.scoreRatingLoader.load(storage.year, semester, disciplineId, studentId),
 		Scores:      storage.getScores(semester, disciplineId, studentId),
+	}, nil
+}
+
+func (storage *Storage) getDisciplineScore(studentId int, disciplineId int, lessonId int) (scoreApi.DisciplineScore, error) {
+	semester, err := storage.getSemesterByStudentIdAndDisciplineId(studentId, disciplineId)
+
+	if err != nil {
+		return scoreApi.DisciplineScore{}, err
+	}
+
+	if semester == 0 {
+		return scoreApi.DisciplineScore{}, nil
+	}
+
+	return scoreApi.DisciplineScore{
+		Discipline: scoreApi.Discipline{
+			Id:   disciplineId,
+			Name: storage.getDisciplineName(disciplineId),
+		},
+		Score: storage.getScore(semester, disciplineId, studentId, lessonId),
 	}, nil
 }
 
@@ -185,6 +206,46 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	})
 
 	return scores
+}
+
+func (storage *Storage) getScore(semester int, disciplineId int, studentId int, lessonId int) scoreApi.Score {
+	studentDisciplineScoresKey := fmt.Sprintf("%d:%d:scores:%d:%d", storage.year, semester, studentId, disciplineId)
+	disciplineLessonsKey := fmt.Sprintf("%d:%d:lessons:%d", storage.year, semester, disciplineId)
+
+	lessonIdPrefix := strconv.Itoa(lessonId) + ":"
+	rawScores := storage.redis.HMGet(context.Background(), studentDisciplineScoresKey, lessonIdPrefix+"1", lessonIdPrefix+"2").Val()
+	if len(rawScores) != 2 || (rawScores[0] == nil && rawScores[1] == nil) {
+		return scoreApi.Score{}
+	}
+
+	lessonDate, lessonTypeId := parseLessonValueString(
+		storage.redis.HGet(context.Background(), disciplineLessonsKey, strconv.Itoa(lessonId)).Val(),
+	)
+
+	score := scoreApi.Score{
+		Lesson: scoreApi.Lesson{
+			Id:   lessonId,
+			Date: lessonDate,
+			Type: storage.lessonTypes[lessonTypeId],
+		},
+	}
+
+	var scoreFloat float64
+
+	for lessonHalf, scoreString := range rawScores {
+		if scoreString != nil {
+			scoreFloat, _ = strconv.ParseFloat(scoreString.(string), 10)
+			if IsAbsentScoreValue == scoreFloat {
+				score.IsAbsent = true
+			} else if lessonHalf == 0 {
+				score.FirstScore = float32(scoreFloat)
+			} else if lessonHalf == 1 {
+				score.SecondScore = float32(scoreFloat)
+			}
+		}
+	}
+
+	return score
 }
 
 func parseLessonIdAndHalf(lessonIdCompacted string) (lessonId int, lessonHalf int) {
