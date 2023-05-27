@@ -506,15 +506,55 @@ func TestGetDisciplineScore(t *testing.T) {
 				Id:   199,
 				Name: "Капітал!",
 			},
+			Score: scoreApi.Score{},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
+
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
+		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+
+		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
+
+		disciplineLessonsKey := "2026:1:lessons:199"
+		redisMock.ExpectHGet(disciplineLessonsKey, "245").RedisNil()
+
+		disciplineDeletedLessonsKey := "2026:1:deleted-lessons:199:245"
+		redisMock.ExpectGet(disciplineDeletedLessonsKey).RedisNil()
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResult, err := storage.getDisciplineScore(
+			1200, expectedResult.Discipline.Id, 245,
+		)
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedResult, actualResult)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("deleted_score", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResult := scoreApi.DisciplineScore{
+			Discipline: scoreApi.Discipline{
+				Id:   199,
+				Name: "Капітал!",
+			},
 			Score: scoreApi.Score{
 				Lesson: scoreApi.Lesson{
 					Id:   245,
 					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 					Type: lessonTypes[1],
 				},
-				FirstScore:  nil,
-				SecondScore: nil,
-				IsAbsent:    false,
 			},
 		}
 
@@ -536,9 +576,7 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisMock.ExpectGet(disciplineDeletedLessonsKey).SetVal("2302121")
 
 		studentDisciplineScoresKey := "2026:1:scores:1200:199"
-
 		expectedScoreValues := make([]interface{}, 2)
-
 		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
 
 		storage := Storage{
