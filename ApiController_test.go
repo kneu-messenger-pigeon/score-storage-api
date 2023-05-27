@@ -129,8 +129,8 @@ func TestGetStudentDiscipline(t *testing.T) {
 							LongName:  "Модульний контроль.",
 						},
 					},
-					FirstScore:  4.5,
-					SecondScore: 0,
+					FirstScore:  floatPointer(4.5),
+					SecondScore: nil,
 					IsAbsent:    true,
 				},
 			},
@@ -254,8 +254,8 @@ func TestGetStudentDisciplineScore(t *testing.T) {
 						LongName:  "Модульний контроль.",
 					},
 				},
-				FirstScore:  4.5,
-				SecondScore: 0,
+				FirstScore:  floatPointer(4.5),
+				SecondScore: nil,
 				IsAbsent:    true,
 			},
 		}
@@ -311,8 +311,8 @@ func TestGetStudentDisciplineScore(t *testing.T) {
 			},
 			Score: scoreApi.Score{
 				Lesson:      scoreApi.Lesson{},
-				FirstScore:  0,
-				SecondScore: 0,
+				FirstScore:  nil,
+				SecondScore: nil,
 				IsAbsent:    false,
 			},
 		}

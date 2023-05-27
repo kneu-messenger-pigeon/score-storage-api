@@ -25,7 +25,7 @@ type Storage struct {
 	scoreRatingLoader ScoreRatingLoaderInterface
 }
 
-const IsAbsentScoreValue = float64(-999999)
+const IsAbsentScoreValue = float32(-999999)
 
 func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error) {
 	semester, disciplineIds, err := storage.getStudentDisciplinesIdsForLastSemester(studentId)
@@ -160,7 +160,7 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 	var lessonTypeId int
 	var lessonDate time.Time
 	var lessonHalf int
-	var scoreFloat float64
+	var scoreValue *float32
 	var exists bool
 
 	scoresMap := make(map[int]*scoreApi.Score, len(rawScores))
@@ -179,13 +179,13 @@ func (storage *Storage) getScores(semester int, disciplineId int, studentId int)
 			}
 		}
 
-		scoreFloat, _ = strconv.ParseFloat(scoreString, 10)
-		if IsAbsentScoreValue == scoreFloat {
+		scoreValue = parseFloat(scoreString)
+		if IsAbsentScoreValue == *scoreValue {
 			scoresMap[lessonId].IsAbsent = true
 		} else if lessonHalf == 1 {
-			scoresMap[lessonId].FirstScore = float32(scoreFloat)
+			scoresMap[lessonId].FirstScore = scoreValue
 		} else if lessonHalf == 2 {
-			scoresMap[lessonId].SecondScore = float32(scoreFloat)
+			scoresMap[lessonId].SecondScore = scoreValue
 		}
 	}
 
@@ -241,22 +241,27 @@ func (storage *Storage) getScore(semester int, disciplineId int, studentId int, 
 	lessonIdPrefix := strconv.Itoa(lessonId) + ":"
 	rawScores := storage.redis.HMGet(ctx, studentDisciplineScoresKey, lessonIdPrefix+"1", lessonIdPrefix+"2").Val()
 
-	var scoreFloat float64
-
+	var scoreValue *float32
 	for lessonHalf, scoreString := range rawScores {
 		if scoreString != nil {
-			scoreFloat, _ = strconv.ParseFloat(scoreString.(string), 10)
-			if IsAbsentScoreValue == scoreFloat {
+			scoreValue = parseFloat(scoreString)
+			if IsAbsentScoreValue == *scoreValue {
 				score.IsAbsent = true
 			} else if lessonHalf == 0 {
-				score.FirstScore = float32(scoreFloat)
+				score.FirstScore = scoreValue
 			} else if lessonHalf == 1 {
-				score.SecondScore = float32(scoreFloat)
+				score.SecondScore = scoreValue
 			}
 		}
 	}
 
 	return score
+}
+
+func parseFloat(input interface{}) *float32 {
+	f64, _ := strconv.ParseFloat(input.(string), 10)
+	f32 := float32(f64)
+	return &f32
 }
 
 func parseLessonIdAndHalf(lessonIdCompacted string) (lessonId int, lessonHalf int) {

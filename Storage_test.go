@@ -39,7 +39,7 @@ func TestNewStorage(t *testing.T) {
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
 
-	t.Run("testPeriodicallyUpdateGeneralDataRun_EmptyReids", func(t *testing.T) {
+	t.Run("testPeriodicallyUpdateGeneralDataRun_EmptyRedis", func(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
 
 		redisClient, redisMock := redismock.NewClientMock()
@@ -206,8 +206,8 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
-					FirstScore:  4.5,
-					SecondScore: 2,
+					FirstScore:  floatPointer(4.5),
+					SecondScore: floatPointer(2),
 					IsAbsent:    false,
 				},
 				{
@@ -216,7 +216,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 						Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 						Type: lessonTypes[1],
 					},
-					FirstScore: 1,
+					FirstScore: floatPointer(1),
 					IsAbsent:   false,
 				},
 				{
@@ -246,7 +246,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 
 		redisMock.ExpectHGetAll(studentDisciplineScoresKey).SetVal(map[string]string{
 			"245:1": "4.5",
-			"255:2": strconv.FormatFloat(IsAbsentScoreValue, 'f', -1, 64),
+			"255:2": strconv.FormatFloat(float64(IsAbsentScoreValue), 'f', -1, 64),
 			"245:2": "2",
 			"247:1": "1",
 		})
@@ -400,8 +400,8 @@ func TestGetDisciplineScore(t *testing.T) {
 					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 					Type: lessonTypes[1],
 				},
-				FirstScore:  4.5,
-				SecondScore: 2,
+				FirstScore:  floatPointer(4.5),
+				SecondScore: floatPointer(2),
 				IsAbsent:    false,
 			},
 		}
@@ -456,8 +456,8 @@ func TestGetDisciplineScore(t *testing.T) {
 					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 					Type: lessonTypes[1],
 				},
-				FirstScore:  0,
-				SecondScore: 0,
+				FirstScore:  nil,
+				SecondScore: nil,
 				IsAbsent:    true,
 			},
 		}
@@ -479,7 +479,7 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisMock.ExpectHGet(disciplineLessonsKey, "245").SetVal("2302121")
 
 		expectedScoreValues := make([]interface{}, 2)
-		expectedScoreValues[0] = strconv.FormatFloat(IsAbsentScoreValue, 'f', 0, 64)
+		expectedScoreValues[0] = strconv.FormatFloat(float64(IsAbsentScoreValue), 'f', 0, 64)
 
 		redisMock.ExpectHMGet(studentDisciplineScoresKey, "245:1", "245:2").SetVal(expectedScoreValues)
 
@@ -512,8 +512,8 @@ func TestGetDisciplineScore(t *testing.T) {
 					Date: time.Date(2023, time.Month(2), 12, 0, 0, 0, 0, time.Local),
 					Type: lessonTypes[1],
 				},
-				FirstScore:  0,
-				SecondScore: 0,
+				FirstScore:  nil,
+				SecondScore: nil,
 				IsAbsent:    false,
 			},
 		}
@@ -637,4 +637,8 @@ func GetTestLessonTypes() map[int]scoreApi.LessonType {
 			LongName:  "Модульний контроль.",
 		},
 	}
+}
+
+func floatPointer(value float32) *float32 {
+	return &value
 }
