@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/go-redis/redis/v9"
 	scoreApi "github.com/kneu-messenger-pigeon/score-api"
+	"github.com/redis/go-redis/v9"
 	"strconv"
 )
 

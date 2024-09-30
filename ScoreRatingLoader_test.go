@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/go-redis/redis/v9"
 	"github.com/go-redis/redismock/v9"
 	scoreApi "github.com/kneu-messenger-pigeon/score-api"
+	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
