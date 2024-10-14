@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	scoreApi "github.com/kneu-messenger-pigeon/score-api"
 	"github.com/redis/go-redis/v9"
@@ -108,7 +109,7 @@ func (storage *Storage) getStudentDisciplinesIdsForLastSemester(studentId int) (
 	for semester = 2; semester >= 1; semester-- {
 		studentDisciplinesKey := fmt.Sprintf("%d:%d:student_disciplines:%d", storage.year, semester, studentId)
 		stringIds, err = storage.redis.SMembers(context.Background(), studentDisciplinesKey).Result()
-		if err != nil && err != redis.Nil {
+		if err != nil && !errors.Is(err, redis.Nil) {
 			return 0, nil, err
 		}
 
@@ -130,7 +131,7 @@ func (storage *Storage) getSemesterByStudentIdAndDisciplineId(studentId int, dis
 
 		isMember, err := storage.redis.SIsMember(context.Background(), studentDisciplinesKey, disciplineId).Result()
 
-		if err != nil && err != redis.Nil {
+		if err != nil && !errors.Is(err, redis.Nil) {
 			return 0, err
 		} else if isMember {
 			return semester, nil
