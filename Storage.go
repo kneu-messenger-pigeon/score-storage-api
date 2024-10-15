@@ -27,6 +27,7 @@ type Storage struct {
 }
 
 const IsAbsentScoreValue = float32(-999999)
+const DisciplineAmountThresholdForSemesterSwitch = 2
 
 func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error) {
 	semester, disciplineIds, err := storage.getStudentDisciplinesIdsForLastSemester(studentId)
@@ -113,7 +114,7 @@ func (storage *Storage) getStudentDisciplinesIdsForLastSemester(studentId int) (
 			return 0, nil, err
 		}
 
-		if err == nil && len(stringIds) != 0 {
+		if err == nil && len(stringIds) >= 2 {
 			break
 		}
 	}

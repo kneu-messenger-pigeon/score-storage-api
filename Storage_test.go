@@ -98,7 +98,9 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
 		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
 
-		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).RedisNil()
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
+			"200",
+		})
 		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).SetVal([]string{
 			"100",
 			"110",
@@ -110,6 +112,86 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		scoreRatingLoader := NewMockScoreRatingLoaderInterface(t)
 		scoreRatingLoader.On("load", 2026, 1, 100, 1100).Return(expectedResults[0].ScoreRating)
 		scoreRatingLoader.On("load", 2026, 1, 110, 1100).Return(expectedResults[1].ScoreRating)
+
+		storage := Storage{
+			redis:             redisClient,
+			year:              2026,
+			lessonTypes:       lessonTypes,
+			scoreRatingLoader: scoreRatingLoader,
+		}
+
+		actualResults, err := storage.getDisciplineScoreResultsByStudentId(1100)
+
+		assert.Equal(t, expectedResults, actualResults)
+		assert.NoError(t, err)
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("success_second_semester", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedResults := scoreApi.DisciplineScoreResults{
+			scoreApi.DisciplineScoreResult{
+				Discipline: scoreApi.Discipline{
+					Id:   200,
+					Name: "Капітал!",
+				},
+				ScoreRating: scoreApi.ScoreRating{
+					Total:         17,
+					StudentsCount: 25,
+					Rating:        8,
+					MinTotal:      10,
+					MaxTotal:      20,
+				},
+			},
+			scoreApi.DisciplineScoreResult{
+				Discipline: scoreApi.Discipline{
+					Id:   204,
+					Name: "Гроші та лихварство",
+				},
+				ScoreRating: scoreApi.ScoreRating{
+					Total:         12,
+					StudentsCount: 25,
+					Rating:        12,
+					MinTotal:      7,
+					MaxTotal:      17,
+				},
+			},
+
+			scoreApi.DisciplineScoreResult{
+				Discipline: scoreApi.Discipline{
+					Id:   210,
+					Name: "Іноваційно-інвестиційний менеджмент",
+				},
+				ScoreRating: scoreApi.ScoreRating{
+					Total:         12,
+					StudentsCount: 25,
+					Rating:        12,
+					MinTotal:      7,
+					MaxTotal:      17,
+				},
+			},
+		}
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(false)
+
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
+
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
+			"200",
+			"204",
+			"210",
+		})
+
+		redisMock.ExpectHGet("2026:discipline:200", "name").SetVal(expectedResults[0].Discipline.Name)
+		redisMock.ExpectHGet("2026:discipline:204", "name").SetVal(expectedResults[1].Discipline.Name)
+		redisMock.ExpectHGet("2026:discipline:210", "name").SetVal(expectedResults[2].Discipline.Name)
+
+		scoreRatingLoader := NewMockScoreRatingLoaderInterface(t)
+		scoreRatingLoader.On("load", 2026, 2, 200, 1100).Return(expectedResults[0].ScoreRating)
+		scoreRatingLoader.On("load", 2026, 2, 204, 1100).Return(expectedResults[1].ScoreRating)
+		scoreRatingLoader.On("load", 2026, 2, 210, 1100).Return(expectedResults[2].ScoreRating)
 
 		storage := Storage{
 			redis:             redisClient,
