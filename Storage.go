@@ -29,27 +29,29 @@ type Storage struct {
 const IsAbsentScoreValue = float32(-999999)
 const DisciplineAmountThresholdForSemesterSwitch = 2
 
-func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error) {
-	semester, disciplineIds, err := storage.getStudentDisciplinesIdsForLastSemester(studentId)
+const MaxSemesterUpdatedInterval = time.Hour * 24 * 7 * 6 // 6 weeks
+// 6 weeks = 2 weeks fir winter holidays + 3 weeks for exams + 2 weeks for next semester lectures
 
+func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (scoreApi.DisciplineScoreResults, error) {
+	disciplines, err := storage.getActualStudentDisciplines(studentId)
 	if err != nil {
 		return nil, err
 	}
 
-	disciplineScoreResults := make([]scoreApi.DisciplineScoreResult, len(disciplineIds))
+	disciplineScoreResults := make([]scoreApi.DisciplineScoreResult, len(disciplines))
 
 	wg := sync.WaitGroup{}
-	wg.Add(len(disciplineIds))
+	wg.Add(len(disciplines))
 
-	for _index := range disciplineIds {
+	for _index := range disciplines {
 		go func(index int) {
-			disciplineId := disciplineIds[index]
+			disciplineId := disciplines[index].DisciplineId
 			disciplineScoreResults[index] = scoreApi.DisciplineScoreResult{
 				Discipline: scoreApi.Discipline{
 					Id:   disciplineId,
 					Name: storage.getDisciplineName(disciplineId),
 				},
-				ScoreRating: storage.scoreRatingLoader.load(storage.year, semester, disciplineId, studentId),
+				ScoreRating: storage.scoreRatingLoader.load(storage.year, disciplines[index].Semester, disciplineId, studentId),
 			}
 			wg.Done()
 		}(_index)
@@ -61,7 +63,7 @@ func (storage *Storage) getDisciplineScoreResultsByStudentId(studentId int) (sco
 }
 
 func (storage *Storage) getDisciplineScoreResultByStudentId(studentId int, disciplineId int) (scoreApi.DisciplineScoreResult, error) {
-	semester, err := storage.getSemesterByStudentIdAndDisciplineId(studentId, disciplineId)
+	semester, err := storage.getSemesterByDisciplineId(disciplineId)
 
 	if err != nil {
 		return scoreApi.DisciplineScoreResult{}, err
@@ -82,7 +84,7 @@ func (storage *Storage) getDisciplineScoreResultByStudentId(studentId int, disci
 }
 
 func (storage *Storage) getDisciplineScore(studentId int, disciplineId int, lessonId int) (scoreApi.DisciplineScore, error) {
-	semester, err := storage.getSemesterByStudentIdAndDisciplineId(studentId, disciplineId)
+	semester, err := storage.getSemesterByDisciplineId(disciplineId)
 
 	if err != nil {
 		return scoreApi.DisciplineScore{}, err
@@ -101,45 +103,95 @@ func (storage *Storage) getDisciplineScore(studentId int, disciplineId int, less
 	}, nil
 }
 
-func (storage *Storage) getStudentDisciplinesIdsForLastSemester(studentId int) (int, []int, error) {
-	var semester int
-	var stringIds []string
-	var err error
+// getActualStudentDisciplines
+// 1. Get student disciplines for the first semester
+// 2. Get student disciplines for the second semester
+// 3. If the second semester disciplines is empty, return the first semester disciplines
+// 4. Check disciplines from the first semester - if they are not in the second semester, check the last update time
+// 5. If the last update time is less than 6 weeks, add the discipline to the result
+// 6. Result will contain disciplines from the seconds semester + from first semesters that are not in the second semester and have been updated less than 6 weeks ago
+func (storage *Storage) getActualStudentDisciplines(studentId int) ([]DisciplineSemester, error) {
+	firstSemesterDisciplines, err := storage.getStudentDisciplinesIdsForSemester(studentId, 1)
+	if err != nil {
+		return nil, err
+	}
 
-	stringIds = make([]string, 0)
-	for semester = 2; semester >= 1; semester-- {
-		studentDisciplinesKey := fmt.Sprintf("%d:%d:student_disciplines:%d", storage.year, semester, studentId)
-		stringIds, err = storage.redis.SMembers(context.Background(), studentDisciplinesKey).Result()
-		if err != nil && !errors.Is(err, redis.Nil) {
-			return 0, nil, err
+	secondSemesterDisciplines, err := storage.getStudentDisciplinesIdsForSemester(studentId, 2)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(secondSemesterDisciplines) == 0 {
+		return firstSemesterDisciplines, nil
+	}
+
+	cleanedFirstSemesterDisciplines := make([]DisciplineSemester, 0, len(firstSemesterDisciplines))
+
+	var lastUpdatedAt time.Time
+	for _, firstSemesterDiscipline := range firstSemesterDisciplines {
+		if secondSemesterDisciplines.Has(firstSemesterDiscipline.DisciplineId) {
+			continue
 		}
 
-		if err == nil && len(stringIds) >= 2 {
-			break
+		_, lastUpdatedAt, err = storage.getDisciplineSemesterAndUpdatedAt(firstSemesterDiscipline.DisciplineId)
+		if err != nil {
+			return nil, err
+		}
+
+		if time.Since(lastUpdatedAt) < MaxSemesterUpdatedInterval {
+			cleanedFirstSemesterDisciplines = append(cleanedFirstSemesterDisciplines, firstSemesterDiscipline)
 		}
 	}
 
-	ids := make([]int, len(stringIds))
-	for index, stringId := range stringIds {
-		ids[index], _ = strconv.Atoi(stringId)
+	if len(cleanedFirstSemesterDisciplines) == 0 {
+		return secondSemesterDisciplines, nil
 	}
-	return semester, ids, nil
+
+	disciplines := make([]DisciplineSemester, len(cleanedFirstSemesterDisciplines)+len(secondSemesterDisciplines))
+	copy(disciplines, cleanedFirstSemesterDisciplines)
+	copy(disciplines[len(cleanedFirstSemesterDisciplines):], secondSemesterDisciplines)
+
+	return disciplines, nil
 }
 
-func (storage *Storage) getSemesterByStudentIdAndDisciplineId(studentId int, disciplineId int) (int, error) {
-	for semester := 2; semester >= 1; semester-- {
-		studentDisciplinesKey := fmt.Sprintf("%d:%d:student_disciplines:%d", storage.year, semester, studentId)
-
-		isMember, err := storage.redis.SIsMember(context.Background(), studentDisciplinesKey, disciplineId).Result()
-
-		if err != nil && !errors.Is(err, redis.Nil) {
-			return 0, err
-		} else if isMember {
-			return semester, nil
-		}
+func (storage *Storage) getStudentDisciplinesIdsForSemester(studentId int, semester int) (DisciplineSemesters, error) {
+	studentDisciplinesKey := fmt.Sprintf("%d:%d:student_disciplines:%d", storage.year, semester, studentId)
+	stringIds, err := storage.redis.SMembers(context.Background(), studentDisciplinesKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return nil, err
 	}
 
-	return 0, nil
+	disciplineSemesters := make(DisciplineSemesters, len(stringIds))
+	for index, stringId := range stringIds {
+		disciplineSemesters[index].Semester = semester
+		disciplineSemesters[index].DisciplineId, _ = strconv.Atoi(stringId)
+	}
+
+	return disciplineSemesters, nil
+}
+
+func (storage *Storage) getSemesterByDisciplineId(disciplineId int) (int, error) {
+	semester, _, err := storage.getDisciplineSemesterAndUpdatedAt(disciplineId)
+	return semester, err
+}
+
+func (storage *Storage) getDisciplineSemesterAndUpdatedAt(disciplineId int) (semester int, updatedAt time.Time, err error) {
+	disciplineLastUpdateAtKey := fmt.Sprintf("%d:discipline_semester_updated_at:%d", storage.year, disciplineId)
+	disciplineLastUpdateAtValue, err := storage.redis.Get(context.Background(), disciplineLastUpdateAtKey).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
+		return 0, time.Time{}, err
+	}
+
+	if len(disciplineLastUpdateAtValue) < 2 {
+		return 0, time.Time{}, nil
+	}
+
+	semester, _ = strconv.Atoi(disciplineLastUpdateAtValue[0:1])
+	unixTimestamp, _ := strconv.ParseInt(disciplineLastUpdateAtValue[1:], 10, 0)
+
+	updatedAt = time.Unix(unixTimestamp, 0)
+
+	return semester, updatedAt, nil
 }
 
 func (storage *Storage) getScores(semester int, disciplineId int, studentId int) []scoreApi.Score {

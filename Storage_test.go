@@ -60,7 +60,11 @@ func TestNewStorage(t *testing.T) {
 }
 
 func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
-	t.Run("success", func(t *testing.T) {
+	t.Parallel()
+
+	t.Run("success-mixed-semester", func(t *testing.T) {
+		t.Parallel()
+
 		lessonTypes := GetTestLessonTypes()
 
 		expectedResults := scoreApi.DisciplineScoreResults{
@@ -79,7 +83,7 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 			},
 			scoreApi.DisciplineScoreResult{
 				Discipline: scoreApi.Discipline{
-					Id:   110,
+					Id:   200,
 					Name: "Гроші та лихварство",
 				},
 				ScoreRating: scoreApi.ScoreRating{
@@ -98,20 +102,32 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
 		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
 
-		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
-			"200",
-		})
 		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).SetVal([]string{
 			"100",
 			"110",
+			"200", // emualte that discipline was in both semester
+		})
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
+			"200",
 		})
 
+		oldDate := time.Now().Add(-MaxSemesterUpdatedInterval - time.Hour)
+
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:100"
+		discipline2SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:110"
+
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		discipline2SemesterUpdatedAtValue := "1" + strconv.FormatInt(oldDate.Unix(), 10)
+
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
+		redisMock.ExpectGet(discipline2SemesterUpdatedAtKey).SetVal(discipline2SemesterUpdatedAtValue)
+
 		redisMock.ExpectHGet("2026:discipline:100", "name").SetVal(expectedResults[0].Discipline.Name)
-		redisMock.ExpectHGet("2026:discipline:110", "name").SetVal(expectedResults[1].Discipline.Name)
+		redisMock.ExpectHGet("2026:discipline:200", "name").SetVal(expectedResults[1].Discipline.Name)
 
 		scoreRatingLoader := NewMockScoreRatingLoaderInterface(t)
 		scoreRatingLoader.On("load", 2026, 1, 100, 1100).Return(expectedResults[0].ScoreRating)
-		scoreRatingLoader.On("load", 2026, 1, 110, 1100).Return(expectedResults[1].ScoreRating)
+		scoreRatingLoader.On("load", 2026, 2, 200, 1100).Return(expectedResults[1].ScoreRating)
 
 		storage := Storage{
 			redis:             redisClient,
@@ -128,6 +144,8 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 	})
 
 	t.Run("success_second_semester", func(t *testing.T) {
+		t.Parallel()
+
 		lessonTypes := GetTestLessonTypes()
 
 		expectedResults := scoreApi.DisciplineScoreResults{
@@ -177,12 +195,15 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		redisMock.MatchExpectationsInOrder(false)
 
 		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
 
 		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
 			"200",
 			"204",
 			"210",
 		})
+
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).RedisNil()
 
 		redisMock.ExpectHGet("2026:discipline:200", "name").SetVal(expectedResults[0].Discipline.Name)
 		redisMock.ExpectHGet("2026:discipline:204", "name").SetVal(expectedResults[1].Discipline.Name)
@@ -216,8 +237,8 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
 		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
 
-		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).RedisNil()
 		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).RedisNil()
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).RedisNil()
 
 		storage := Storage{
 			redis:             redisClient,
@@ -233,7 +254,7 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
 
-	t.Run("redis_error", func(t *testing.T) {
+	t.Run("redis_error_first_semester", func(t *testing.T) {
 		lessonTypes := GetTestLessonTypes()
 
 		expectedError := errors.New("expected error")
@@ -242,9 +263,7 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		redisMock.MatchExpectationsInOrder(true)
 
 		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
 
-		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).RedisNil()
 		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).SetErr(expectedError)
 
 		storage := Storage{
@@ -259,6 +278,79 @@ func TestStorageGetDisciplineScoreResultsByStudentId(t *testing.T) {
 		assert.Nil(t, actualResults)
 		assert.Error(t, err)
 		assert.Equal(t, expectedError, err)
+
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("redis_error_second_semester", func(t *testing.T) {
+		lessonTypes := GetTestLessonTypes()
+
+		expectedError := errors.New("expected error")
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(true)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
+
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).RedisNil()
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetErr(expectedError)
+
+		storage := Storage{
+			redis:             redisClient,
+			year:              2026,
+			lessonTypes:       lessonTypes,
+			scoreRatingLoader: NewMockScoreRatingLoaderInterface(t),
+		}
+
+		actualResults, err := storage.getDisciplineScoreResultsByStudentId(1100)
+
+		assert.Nil(t, actualResults)
+		assert.Error(t, err)
+		assert.Equal(t, expectedError, err)
+
+		assert.NoError(t, redisMock.ExpectationsWereMet())
+	})
+
+	t.Run("redis_error_get_discipline_updated_at", func(t *testing.T) {
+		t.Parallel()
+
+		lessonTypes := GetTestLessonTypes()
+
+		redisClient, redisMock := redismock.NewClientMock()
+		redisMock.MatchExpectationsInOrder(false)
+
+		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1100"
+		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1100"
+
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester1).SetVal([]string{
+			"100",
+			"110",
+			"200", // emualte that discipline was in both semester
+		})
+		redisMock.ExpectSMembers(studentDisciplinesKeySemester2).SetVal([]string{
+			"200",
+		})
+
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:100"
+		discipline2SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:110"
+
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
+		redisMock.ExpectGet(discipline2SemesterUpdatedAtKey).SetErr(assert.AnError)
+
+		storage := Storage{
+			redis:       redisClient,
+			year:        2026,
+			lessonTypes: lessonTypes,
+		}
+
+		actualResults, err := storage.getDisciplineScoreResultsByStudentId(1100)
+
+		assert.Nil(t, actualResults)
+		assert.Error(t, err)
+		assert.Equal(t, assert.AnError, err)
 
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
@@ -315,11 +407,9 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -377,11 +467,9 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -405,7 +493,7 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
 
-	t.Run("student_has_not_discipline", func(t *testing.T) {
+	t.Run("discipline_never_updated", func(t *testing.T) {
 		lessonTypes := GetTestLessonTypes()
 
 		redisClient, redisMock := redismock.NewClientMock()
@@ -413,11 +501,8 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 
 		disciplineId := 850
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, disciplineId).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, disciplineId).RedisNil()
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:850"
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).RedisNil()
 
 		storage := Storage{
 			redis:             redisClient,
@@ -443,11 +528,8 @@ func TestGetDisciplineScoreResultByStudentId(t *testing.T) {
 
 		disciplineId := 850
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, disciplineId).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, disciplineId).SetErr(expectedError)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:850"
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetErr(expectedError)
 
 		storage := Storage{
 			redis:             redisClient,
@@ -491,11 +573,9 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -547,11 +627,9 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -594,11 +672,9 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -643,11 +719,9 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).SetVal(true)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		discipline1SemesterUpdatedAtValue := "1" + strconv.FormatInt(time.Now().Unix(), 10)
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetVal(discipline1SemesterUpdatedAtValue)
 
 		redisMock.ExpectHGet("2026:discipline:199", "name").SetVal(expectedResult.Discipline.Name)
 
@@ -676,7 +750,7 @@ func TestGetDisciplineScore(t *testing.T) {
 		assert.NoError(t, redisMock.ExpectationsWereMet())
 	})
 
-	t.Run("student_has_not_discipline", func(t *testing.T) {
+	t.Run("discipline_never_updated", func(t *testing.T) {
 		lessonTypes := GetTestLessonTypes()
 
 		expectedResult := scoreApi.DisciplineScore{
@@ -690,11 +764,8 @@ func TestGetDisciplineScore(t *testing.T) {
 		redisClient, redisMock := redismock.NewClientMock()
 		redisMock.MatchExpectationsInOrder(true)
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, expectedResult.Discipline.Id).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, expectedResult.Discipline.Id).RedisNil()
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:199"
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).RedisNil()
 
 		storage := Storage{
 			redis:       redisClient,
@@ -721,11 +792,8 @@ func TestGetDisciplineScore(t *testing.T) {
 
 		disciplineId := 850
 
-		studentDisciplinesKeySemester1 := "2026:1:student_disciplines:1200"
-		studentDisciplinesKeySemester2 := "2026:2:student_disciplines:1200"
-
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester2, disciplineId).RedisNil()
-		redisMock.ExpectSIsMember(studentDisciplinesKeySemester1, disciplineId).SetErr(expectedError)
+		discipline1SemesterUpdatedAtKey := "2026:discipline_semester_updated_at:850"
+		redisMock.ExpectGet(discipline1SemesterUpdatedAtKey).SetErr(expectedError)
 
 		storage := Storage{
 			redis:             redisClient,
